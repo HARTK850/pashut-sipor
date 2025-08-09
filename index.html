@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>סיפורAI - יצירת סיפורים באמצעות בינה מלאכותית</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+         Header 
+        <header class="header">
+            <h1 class="main-title">סיפורAI</h1>
+            <p class="subtitle">יצירת סיפורים מרתקים באמצעות בינה מלאכותית</p>
+        </header>
+
+         API Key Section 
+        <section class="api-section" id="apiSection">
+            <div class="card">
+                <h2>הגדרת מפתח API</h2>
+                <div class="api-input-group">
+                    <label for="apiKey">הזן מפתח Google AI API:</label>
+                    <input type="password" id="apiKey" placeholder="הזן את מפתח ה-API שלך כאן">
+                    <button id="saveApiKey" class="btn btn-primary">שמור מפתח</button>
+                    <button id="updateApiKey" class="btn btn-secondary" style="display: none;">עדכן מפתח</button>
+                </div>
+                <div class="api-status" id="apiStatus"></div>
+            </div>
+        </section>
+
+         Story Creation Section 
+        <section class="story-section" id="storySection" style="display: none;">
+            <div class="card">
+                <h2>יצירת סיפור חדש</h2>
+                <div class="story-input-group">
+                    <label for="storyTopic">נושא הסיפור:</label>
+                    <textarea id="storyTopic" placeholder="תאר את הנושא לסיפור, למשל: 'שני חברים מתווכחים על אוכל'"></textarea>
+                    <button id="createStory" class="btn btn-primary">צור סיפור</button>
+                </div>
+                <div class="loading" id="loading" style="display: none;">
+                    <div class="spinner"></div>
+                    <p>יוצר את הסיפור...</p>
+                </div>
+            </div>
+
+             Examples Section 
+            <div class="card examples-card">
+                <h3>דוגמאות לנושאים:</h3>
+                <div class="examples">
+                    <button class="example-btn" data-example="ילד קטן שמגלה דלת קסומה בגינה">ילד קטן שמגלה דלת קסומה בגינה</button>
+                    <button class="example-btn" data-example="חתול וכלב שהופכים לחברים הכי טובים">חתול וכלב שהופכים לחברים הכי טובים</button>
+                    <button class="example-btn" data-example="נסיכה שלומדת לטוס על דרקון">נסיכה שלומדת לטוס על דרקון</button>
+                    <button class="example-btn" data-example="רובוט שרוצה להיות טבח">רובוט שרוצה להיות טבח</button>
+                </div>
+            </div>
+        </section>
+
+         Current Story Display 
+        <section class="current-story" id="currentStory" style="display: none;">
+            <div class="card">
+                <h2>הסיפור שלך</h2>
+                <div class="story-content" id="storyContent"></div>
+                <div class="audio-player" id="audioPlayer" style="display: none;">
+                    <h3>האזן לסיפור:</h3>
+                    <audio controls id="audioElement">
+                        <source id="audioSource" type="audio/mpeg">
+                        הדפדפן שלך לא תומך בנגן האודיו.
+                    </audio>
+                    <button id="downloadAudio" class="btn btn-secondary">הורד קובץ אודיו</button>
+                </div>
+            </div>
+        </section>
+
+         History Section 
+        <section class="history-section" id="historySection" style="display: none;">
+            <div class="card">
+                <h2>הסיפורים שלי</h2>
+                <div class="history-list" id="historyList">
+                    <p class="no-stories">עדיין לא יצרת סיפורים</p>
+                </div>
+                <button id="clearHistory" class="btn btn-danger">נקה היסטוריה</button>
+            </div>
+        </section>
+
+         Navigation 
+        <nav class="navigation">
+            <button class="nav-btn active" data-section="story">יצירת סיפור</button>
+            <button class="nav-btn" data-section="history">הסיפורים שלי</button>
+        </nav>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
