@@ -1,94 +1,124 @@
 <!DOCTYPE html>
 <html lang="he" dir="rtl">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>סיפורAI - יצירת סיפורים באמצעות בינה מלאכותית</title>
-    <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>סיפורAI - יצירת סיפורים עם בינה מלאכותית</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div class="container">
-         Header 
-        <header class="header">
-            <h1 class="main-title">סיפורAI</h1>
-            <p class="subtitle">יצירת סיפורים מרתקים באמצעות בינה מלאכותית</p>
+    <div id="app-container">
+        <header>
+            <div class="logo-container">
+                <svg class="logo-icon" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0.6"></path>
+                    <path d="M12 22V12" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M22 7v10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                    <path d="M2 7v10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"></path>
+                </svg>
+                <h1>סיפור<span>AI</span></h1>
+            </div>
+            <div id="api-key-display" class="api-key-display-area" style="display: none;">
+                <div class="api-key-status">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                    </svg>
+                    <span>מפתח API נשמר</span>
+                </div>
+                <button id="update-api-key-btn" class="button-secondary">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.536L15.232 5.232z"></path>
+                    </svg>
+                    עדכן מפתח
+                </button>
+            </div>
         </header>
 
-         API Key Section 
-        <section class="api-section" id="apiSection">
-            <div class="card">
+        <main>
+            <div id="api-key-setup" class="card">
                 <h2>הגדרת מפתח API</h2>
-                <div class="api-input-group">
-                    <label for="apiKey">הזן מפתח Google AI API:</label>
-                    <input type="password" id="apiKey" placeholder="הזן את מפתח ה-API שלך כאן">
-                    <button id="saveApiKey" class="btn btn-primary">שמור מפתח</button>
-                    <button id="updateApiKey" class="btn btn-secondary" style="display: none;">עדכן מפתח</button>
+                <p>כדי להתחיל, אנא הזן את מפתח ה-API שלך עבור Google Gemini.</p>
+                <div class="input-group">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z"></path>
+                    </svg>
+                    <input type="password" id="api-key-input" placeholder="הזן מפתח API">
                 </div>
-                <div class="api-status" id="apiStatus"></div>
-            </div>
-        </section>
-
-         Story Creation Section 
-        <section class="story-section" id="storySection" style="display: none;">
-            <div class="card">
-                <h2>יצירת סיפור חדש</h2>
-                <div class="story-input-group">
-                    <label for="storyTopic">נושא הסיפור:</label>
-                    <textarea id="storyTopic" placeholder="תאר את הנושא לסיפור, למשל: 'שני חברים מתווכחים על אוכל'"></textarea>
-                    <button id="createStory" class="btn btn-primary">צור סיפור</button>
-                </div>
-                <div class="loading" id="loading" style="display: none;">
-                    <div class="spinner"></div>
-                    <p>יוצר את הסיפור...</p>
-                </div>
+                <button id="save-api-key-btn" class="button-primary" disabled>שמור מפתח</button>
             </div>
 
-             Examples Section 
-            <div class="card examples-card">
-                <h3>דוגמאות לנושאים:</h3>
-                <div class="examples">
-                    <button class="example-btn" data-example="ילד קטן שמגלה דלת קסומה בגינה">ילד קטן שמגלה דלת קסומה בגינה</button>
-                    <button class="example-btn" data-example="חתול וכלב שהופכים לחברים הכי טובים">חתול וכלב שהופכים לחברים הכי טובים</button>
-                    <button class="example-btn" data-example="נסיכה שלומדת לטוס על דרקון">נסיכה שלומדת לטוס על דרקון</button>
-                    <button class="example-btn" data-example="רובוט שרוצה להיות טבח">רובוט שרוצה להיות טבח</button>
+            <div id="main-content" style="display: none;">
+                <div class="story-generation-column">
+                    <div class="card">
+                        <label for="story-prompt">מה תרצה שיהיה בסיפור שלך?</label>
+                        <textarea id="story-prompt" rows="4" placeholder="לדוגמה: ילד שמוצא מפה לאוצר אבוד..."></textarea>
+                        <div class="example-prompts">
+                            <p>או נסה אחת מהדוגמאות:</p>
+                            <div>
+                                <button class="button-tag">שני חברים מתווכחים על אוכל</button>
+                                <button class="button-tag">רובוט שמגלה רגשות בפעם הראשונה</button>
+                                <button class="button-tag">מסע בזמן לתקופת הדינוזאורים שהשתבש</button>
+                                <button class="button-tag">חתול רחוב שמציל את העיר</button>
+                            </div>
+                        </div>
+                        <button id="generate-story-btn" class="button-primary" disabled>
+                            <span id="generate-btn-text">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                  <path stroke-linecap="round" stroke-linejoin="round" d="M5 3v4M3 5h4M6 17v4m-2-2h4m5-16l2.293 2.293a1 1 0 01-1.414 1.414L13 6.414M16.414 13l2.293 2.293a1 1 0 01-1.414 1.414L15 16.414M10.5 5.5L12 4m-1.5 1.5L9 7"></path>
+                                </svg>
+                                צור סיפור
+                            </span>
+                            <div id="loader" class="loader" style="display: none;"></div>
+                        </button>
+                    </div>
+
+                    <div id="error-message" class="error-message" style="display: none;"></div>
+
+                    <div id="current-story-container" style="display: none;">
+                        <div class="card story-display">
+                            <h2 id="current-story-prompt"></h2>
+                            <div class="story-player">
+                                <div class="player-title">נגן אודיו</div>
+                                <div class="player-controls">
+                                    <button id="play-pause-btn" class="button-icon">
+                                        <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" class="icon" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+                                        <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" class="icon" fill="currentColor" viewBox="0 0 24 24" style="display:none;"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
+                                    </button>
+                                    <button id="stop-btn" class="button-icon" disabled>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="currentColor" viewBox="0 0 24 24"><path d="M6 6h12v12H6z"></path></svg>
+                                    </button>
+                                </div>
+                                <button id="download-btn" title="הורד את טקסט הסיפור" class="button-icon secondary">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+                                </button>
+                            </div>
+                            <p id="current-story-text" class="story-text"></p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="story-history-column">
+                    <div class="card history-card">
+                        <h2>
+                            <svg xmlns="http://www.w3.org/2000/svg" class="icon" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                               <path stroke-linecap="round" stroke-linejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"></path>
+                            </svg>
+                            הסיפורים שלי
+                        </h2>
+                        <ul id="story-history-list">
+                            <li id="no-stories-message">
+                                <p class="empty-history-message">עדיין לא יצרת סיפורים. <br>ההיסטוריה תופיע כאן.</p>
+                            </li>
+                        </ul>
+                    </div>
                 </div>
             </div>
-        </section>
-
-         Current Story Display 
-        <section class="current-story" id="currentStory" style="display: none;">
-            <div class="card">
-                <h2>הסיפור שלך</h2>
-                <div class="story-content" id="storyContent"></div>
-                <div class="audio-player" id="audioPlayer" style="display: none;">
-                    <h3>האזן לסיפור:</h3>
-                    <audio controls id="audioElement">
-                        <source id="audioSource" type="audio/mpeg">
-                        הדפדפן שלך לא תומך בנגן האודיו.
-                    </audio>
-                    <button id="downloadAudio" class="btn btn-secondary">הורד קובץ אודיו</button>
-                </div>
-            </div>
-        </section>
-
-         History Section 
-        <section class="history-section" id="historySection" style="display: none;">
-            <div class="card">
-                <h2>הסיפורים שלי</h2>
-                <div class="history-list" id="historyList">
-                    <p class="no-stories">עדיין לא יצרת סיפורים</p>
-                </div>
-                <button id="clearHistory" class="btn btn-danger">נקה היסטוריה</button>
-            </div>
-        </section>
-
-         Navigation 
-        <nav class="navigation">
-            <button class="nav-btn active" data-section="story">יצירת סיפור</button>
-            <button class="nav-btn" data-section="history">הסיפורים שלי</button>
-        </nav>
+        </main>
+        
     </div>
-
-    <script src="script.js"></script>
+    <script type="module" src="index.js"></script>
 </body>
 </html>
