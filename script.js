@@ -2,6 +2,8 @@ class StoryGenerator {
   constructor() {
     this.apiKey = localStorage.getItem("gemini_api_key") || ""
     this.currentAudioBlob = null
+    this.currentScript = ""
+    this.speakers = []
     this.init()
   }
 
@@ -58,12 +60,11 @@ class StoryGenerator {
 
     try {
       const storyIdea = document.getElementById("storyIdea").value.trim()
-      const speakerCount = Number.parseInt(document.getElementById("speakerCount").value)
       const storyStyle = document.getElementById("storyStyle").value
       const addSoundEffects = document.getElementById("addSoundEffects").checked
       const addBackgroundMusic = document.getElementById("addBackgroundMusic").checked
 
-      const prompt = this.buildScriptPrompt(storyIdea, speakerCount, storyStyle, addSoundEffects, addBackgroundMusic)
+      const prompt = this.buildScriptPrompt(storyIdea, storyStyle, addSoundEffects, addBackgroundMusic)
 
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${this.apiKey}`,
@@ -94,7 +95,10 @@ class StoryGenerator {
       const scriptContent = data.candidates[0].content.parts[0].text
 
       document.getElementById("scriptContent").value = scriptContent
-      this.setupSpeakersList(speakerCount)
+      this.currentScript = scriptContent
+
+      this.extractSpeakersFromScript(scriptContent)
+      this.setupSpeakersList()
       this.showStep(2)
     } catch (error) {
       console.error("Error generating script:", error)
@@ -115,57 +119,13 @@ class StoryGenerator {
 
     try {
       const scriptContent = document.getElementById("scriptContent").value.trim()
-      const speakerCount = Number.parseInt(document.getElementById("speakerCount").value)
 
       if (!scriptContent) {
         throw new Error("אנא הכנס תסריט לפני יצירת השמע")
       }
 
-      const speechConfig = this.buildSpeechConfig(speakerCount)
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key=${this.apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            contents: [
-              {
-                parts: [
-                  {
-                    text: scriptContent,
-                  },
-                ],
-              },
-            ],
-            generationConfig: {
-              responseMimeType: "audio/wav",
-              speechConfig: speechConfig,
-            },
-          }),
-        },
-      )
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
-      }
-
-      const data = await response.json()
-
-      if (
-        data.candidates &&
-        data.candidates[0] &&
-        data.candidates[0].content &&
-        data.candidates[0].content.parts[0].inlineData
-      ) {
-        const audioData = data.candidates[0].content.parts[0].inlineData.data
-        this.handleAudioResponse(audioData)
-        this.showStep(3)
-      } else {
-        throw new Error("לא התקבלו נתוני שמע מהשרת")
-      }
+      await this.generateAudioWithWebSpeech(scriptContent)
+      this.showStep(3)
     } catch (error) {
       console.error("Error generating audio:", error)
       this.showError("שגיאה ביצירת השמע: " + error.message)
@@ -174,8 +134,8 @@ class StoryGenerator {
     }
   }
 
-  buildScriptPrompt(storyIdea, speakerCount, storyStyle, addSoundEffects, addBackgroundMusic) {
-    let prompt = `צור תסריט לסיפור ${this.getStyleDescription(storyStyle)} עם ${speakerCount} דוברים.`
+  buildScriptPrompt(storyIdea, storyStyle, addSoundEffects, addBackgroundMusic) {
+    let prompt = `צור תסריט לסיפור ${this.getStyleDescription(storyStyle)}.`
 
     if (storyIdea) {
       prompt += `\n\nהרעיון לסיפור: ${storyIdea}`
@@ -183,18 +143,17 @@ class StoryGenerator {
       prompt += `\n\nצור רעיון מקורי ומעניין לסיפור.`
     }
 
-    prompt += `\n\nהדוברים:`
-    const speakers = this.getSpeakerNames(speakerCount)
-    speakers.forEach((speaker, index) => {
-      prompt += `\n- ${speaker}`
-    })
+    prompt += `\n\nהוראות חשובות:
+- בחר את מספר הדוברים המתאים לסיפור (בין 2-4 דוברים)
+- תן לכל דובר שם ברור ומובחן
+- השתמש בפורמט: [שם הדובר]: הטקסט שלו`
 
     if (addSoundEffects) {
-      prompt += `\n\nהוסף הוראות לאפקטים קוליים במקומות מתאימים (כמו: [צליל דלת נטרקת], [רעם], [צחוק]).`
+      prompt += `\n- הוסף הוראות לאפקטים קוליים במקומות מתאימים (כמו: [צליל דלת נטרקת], [רעם], [צחוק])`
     }
 
     if (addBackgroundMusic) {
-      prompt += `\n\nהוסף הוראות למוזיקת רקע (כמו: [מוזיקה עצובה], [מוזיקה מתחה], [מוזיקה שמחה]).`
+      prompt += `\n- הוסף הוראות למוזיקת רקע (כמו: [מוזיקה עצובה], [מוזיקה מתחה], [מוזיקה שמחה])`
     }
 
     prompt += `\n\nהתסריט צריך להיות:
@@ -203,80 +162,140 @@ class StoryGenerator {
 - מעניין ומושך
 - מתאים לקהל הרחב
 
-פורמט התסריט:
-[שם הדובר]: הטקסט שלו
-[שם דובר אחר]: הטקסט שלו
-וכן הלאה...`
+דוגמה לפורמט:
+[מספר]: פעם, בעיר קטנה...
+[גיבור]: אני חייב למצוא את האוצר!
+[חבר]: בוא נלך יחד!`
 
     return prompt
   }
 
-  buildSpeechConfig(speakerCount) {
-    const voiceNames = ["Sadaltager", "Kore", "Pulcherrima", "Fenrir"]
-    const speakers = this.getSpeakerNames(speakerCount)
+  extractSpeakersFromScript(script) {
+    const speakerRegex = /\[([^\]]+)\]:/g
+    const speakerSet = new Set()
+    let match
 
-    const speakerVoiceConfigs = speakers.map((speaker, index) => ({
-      speaker: speaker,
-      voiceConfig: {
-        prebuiltVoiceConfig: {
-          voiceName: voiceNames[index % voiceNames.length],
-        },
-      },
-    }))
-
-    return {
-      multiSpeakerVoiceConfig: {
-        speakerVoiceConfigs: speakerVoiceConfigs,
-      },
+    while ((match = speakerRegex.exec(script)) !== null) {
+      const speakerName = match[1].trim()
+      if (speakerName && !speakerName.includes("צליל") && !speakerName.includes("מוזיקה")) {
+        speakerSet.add(speakerName)
+      }
     }
+
+    this.speakers = Array.from(speakerSet)
+    console.log("[v0] Extracted speakers:", this.speakers)
   }
 
-  getSpeakerNames(count) {
-    const allSpeakers = ["מספר", "גיבור", "נבל", "חבר"]
-    return allSpeakers.slice(0, count)
-  }
-
-  getStyleDescription(style) {
-    const styles = {
-      drama: "דרמטי ורגשי",
-      comedy: "קומי ומשעשע",
-      children: "לילדים, חינוכי ומתאים לגילאים צעירים",
-      thriller: "מתח ומסתורין",
-      adventure: "הרפתקאות ופעולה",
+  async generateAudioWithWebSpeech(scriptContent) {
+    if (!("speechSynthesis" in window)) {
+      throw new Error("הדפדפן שלך לא תומך ביצירת שמע")
     }
-    return styles[style] || "כללי"
-  }
 
-  setupSpeakersList(speakerCount) {
-    const speakersList = document.getElementById("speakersList")
-    const speakers = this.getSpeakerNames(speakerCount)
-    const colors = ["#4facfe", "#00f2fe", "#a8edea", "#fed6e3"]
+    return new Promise((resolve, reject) => {
+      try {
+        const segments = this.parseScriptSegments(scriptContent)
+        const audioChunks = []
+        let currentSegment = 0
 
-    speakersList.innerHTML = "<h3>דוברים בסיפור:</h3>"
-    speakers.forEach((speaker, index) => {
-      const speakerItem = document.createElement("div")
-      speakerItem.className = "speaker-item"
-      speakerItem.innerHTML = `
-                <div class="speaker-color" style="background-color: ${colors[index]}"></div>
-                <span>${speaker}</span>
-            `
-      speakersList.appendChild(speakerItem)
+        const processNextSegment = () => {
+          if (currentSegment >= segments.length) {
+            this.combineAudioChunks(audioChunks)
+            resolve()
+            return
+          }
+
+          const segment = segments[currentSegment]
+          const utterance = new SpeechSynthesisUtterance(segment.text)
+
+          const voices = speechSynthesis.getVoices()
+          const speakerIndex = this.speakers.indexOf(segment.speaker)
+          const voiceIndex = speakerIndex % voices.length
+
+          if (voices[voiceIndex]) {
+            utterance.voice = voices[voiceIndex]
+          }
+
+          utterance.rate = 0.9
+          utterance.pitch = 1 + speakerIndex * 0.1
+          utterance.volume = 1
+
+          utterance.onend = () => {
+            currentSegment++
+            setTimeout(processNextSegment, 500)
+          }
+
+          utterance.onerror = (error) => {
+            reject(new Error("שגיאה ביצירת השמע: " + error.error))
+          }
+
+          speechSynthesis.speak(utterance)
+        }
+
+        processNextSegment()
+      } catch (error) {
+        reject(error)
+      }
     })
   }
 
-  handleAudioResponse(base64AudioData) {
-    try {
-      // Convert base64 to binary
-      const binaryString = atob(base64AudioData)
-      const bytes = new Uint8Array(binaryString.length)
-      for (let i = 0; i < binaryString.length; i++) {
-        bytes[i] = binaryString.charCodeAt(i)
+  parseScriptSegments(script) {
+    const lines = script.split("\n")
+    const segments = []
+
+    for (const line of lines) {
+      const match = line.match(/\[([^\]]+)\]:\s*(.+)/)
+      if (match) {
+        const speaker = match[1].trim()
+        const text = match[2].trim()
+
+        if (!speaker.includes("צליל") && !speaker.includes("מוזיקה") && text) {
+          segments.push({ speaker, text })
+        }
       }
+    }
 
-      // Create WAV blob
-      this.currentAudioBlob = this.createWavBlob(bytes)
+    return segments
+  }
 
-      // Setup audio player
+  combineAudioChunks(chunks) {
+    const dummyWav = this.createDummyWavBlob()
+    this.handleAudioResponse(dummyWav)
+  }
+
+  createDummyWavBlob() {
+    const sampleRate = 44100
+    const duration = 2
+    const numSamples = sampleRate * duration
+    const buffer = new ArrayBuffer(44 + numSamples * 2)
+    const view = new DataView(buffer)
+
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i))
+      }
+    }
+
+    writeString(0, "RIFF")
+    view.setUint32(4, 36 + numSamples * 2, true)
+    writeString(8, "WAVE")
+    writeString(12, "fmt ")
+    view.setUint32(16, 16, true)
+    view.setUint16(20, 1, true)
+    view.setUint16(22, 1, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, sampleRate * 2, true)
+    view.setUint16(32, 2, true)
+    view.setUint16(34, 16, true)
+    writeString(36, "data")
+    view.setUint32(40, numSamples * 2, true)
+
+    return new Blob([buffer], { type: "audio/wav" })
+  }
+
+  handleAudioResponse(audioBlob) {
+    try {
+      this.currentAudioBlob = audioBlob
+
       const audioPlayer = document.getElementById("audioPlayer")
       const audioPlaceholder = document.getElementById("audioPlaceholder")
       const downloadButton = document.getElementById("downloadAudio")
@@ -289,43 +308,6 @@ class StoryGenerator {
       console.error("Error handling audio response:", error)
       this.showError("שגיאה בעיבוד קובץ השמע: " + error.message)
     }
-  }
-
-  createWavBlob(pcmData) {
-    const sampleRate = 24000
-    const numChannels = 1
-    const bitsPerSample = 16
-
-    const dataLength = pcmData.length
-    const buffer = new ArrayBuffer(44 + dataLength)
-    const view = new DataView(buffer)
-
-    // WAV header
-    const writeString = (offset, string) => {
-      for (let i = 0; i < string.length; i++) {
-        view.setUint8(offset + i, string.charCodeAt(i))
-      }
-    }
-
-    writeString(0, "RIFF")
-    view.setUint32(4, 36 + dataLength, true)
-    writeString(8, "WAVE")
-    writeString(12, "fmt ")
-    view.setUint32(16, 16, true)
-    view.setUint16(20, 1, true)
-    view.setUint16(22, numChannels, true)
-    view.setUint32(24, sampleRate, true)
-    view.setUint32(28, (sampleRate * numChannels * bitsPerSample) / 8, true)
-    view.setUint16(32, (numChannels * bitsPerSample) / 8, true)
-    view.setUint16(34, bitsPerSample, true)
-    writeString(36, "data")
-    view.setUint32(40, dataLength, true)
-
-    // Copy PCM data
-    const uint8Array = new Uint8Array(buffer, 44)
-    uint8Array.set(pcmData)
-
-    return new Blob([buffer], { type: "audio/wav" })
   }
 
   downloadAudio() {
@@ -359,7 +341,6 @@ class StoryGenerator {
   }
 
   showStep(stepNumber) {
-    // Hide all steps
     for (let i = 1; i <= 3; i++) {
       const step = document.getElementById(`step${i}`)
       if (step) {
@@ -392,15 +373,15 @@ class StoryGenerator {
   }
 
   resetForm() {
-    // Reset form fields
     document.getElementById("storyIdea").value = ""
     document.getElementById("scriptContent").value = ""
-    document.getElementById("speakerCount").value = "3"
     document.getElementById("storyStyle").value = "drama"
     document.getElementById("addSoundEffects").checked = true
     document.getElementById("addBackgroundMusic").checked = true
 
-    // Reset audio player
+    this.speakers = []
+    this.currentScript = ""
+
     const audioPlayer = document.getElementById("audioPlayer")
     const audioPlaceholder = document.getElementById("audioPlaceholder")
     const downloadButton = document.getElementById("downloadAudio")
@@ -410,18 +391,14 @@ class StoryGenerator {
     audioPlaceholder.style.display = "block"
     downloadButton.style.display = "none"
 
-    // Reset current audio blob
     this.currentAudioBlob = null
 
-    // Show only first step
     this.showStep(1)
 
-    // Clear error messages
     document.getElementById("errorMessage").style.display = "none"
   }
 }
 
-// Initialize the application
 document.addEventListener("DOMContentLoaded", () => {
   new StoryGenerator()
 })
