@@ -149,7 +149,7 @@ class StoryGenerator {
 - השתמש בפורמט: [שם הדובר]: הטקסט שלו`
 
     if (addSoundEffects) {
-      prompt += `\n- הוסף הוראות לאפקטים קוליים במקומות מתאימים (כמו: [צליל דלת נטרקת], [רעם], [צחוק])`
+      prompt += `\n- הוסף הוראות לאפקטים קוליים במקומות מתאימים (כמו: [צליל דלת נטרalte], [רעם], [צחוק])`
     }
 
     if (addBackgroundMusic) {
@@ -168,6 +168,21 @@ class StoryGenerator {
 [חבר]: בוא נלך יחד!`
 
     return prompt
+  }
+
+  getStyleDescription(style) {
+    const styleDescriptions = {
+      drama: "דרמטי ומרגש",
+      comedy: "קומי ומשעשע",
+      adventure: "הרפתקני ומותח",
+      fantasy: "פנטזיה קסומה",
+      mystery: "מסתורין מותח",
+      romance: "רומנטי ומרגש",
+      horror: "אימה מותחת",
+      scifi: "מדע בדיוני עתידני",
+    }
+
+    return styleDescriptions[style] || "מעניין ומושך"
   }
 
   extractSpeakersFromScript(script) {
