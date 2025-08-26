@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>פשוט סיפור - מחולל סיפורים</title>
+    <title>פשוט סיפור - מחולל סיפורים חיים</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;500;600;700&family=Alef:wght@400;700&display=swap" rel="stylesheet">
@@ -14,7 +14,7 @@
         <!-- Header -->
         <header class="header">
             <h1 class="logo">פשוט סיפור</h1>
-            <p class="tagline">מחולל סיפורים עם בינה מלאכותית</p>
+            <p class="tagline">מחולל סיפורים חיים עם דוברים מרובים</p>
         </header>
 
         <!-- API Key Setup -->
@@ -79,6 +79,8 @@
             <div class="step-content">
                 <div class="script-info">
                     <div class="speakers-list" id="speakersList"></div>
+                    <!-- Added scriptStatus element for showing speaker information -->
+                    <div id="scriptStatus" class="status-message"></div>
                 </div>
                 <textarea id="scriptContent" placeholder="התסריט יופיע כאן..."></textarea>
                 <button id="generateAudio" class="btn btn-primary">
