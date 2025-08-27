@@ -216,79 +216,14 @@ class StoryGenerator {
         speakerTexts[seg.speaker] += seg.text + " "
       })
 
-      if (this.speakers.length <= 2) {
-        console.log("[v0] Using multi-speaker mode for", this.speakers.length, "speakers")
+      for (const [speaker, text] of Object.entries(speakerTexts)) {
+        const speakerIndex = this.speakers.indexOf(speaker)
+        const voiceName = voiceNames[speakerIndex % voiceNames.length]
 
-        const speakerVoiceConfigs = this.speakers.map((speaker, index) => ({
-          speaker: speaker,
-          voiceConfig: {
-            prebuiltVoiceConfig: {
-              voiceName: voiceNames[index % voiceNames.length],
-            },
-          },
-        }))
+        console.log(`[v0] Processing speaker: ${speaker}, Voice: ${voiceName}`)
 
-        const cleanText = segments.map((seg) => seg.text).join(" ")
-
-        const requestBody = {
-          contents: [{ parts: [{ text: cleanText }] }],
-          generationConfig: {
-            responseModalities: ["AUDIO"],
-            speechConfig: {
-              multiSpeakerVoiceConfig: {
-                speakerVoiceConfigs: speakerVoiceConfigs,
-              },
-            },
-          },
-        }
-
-        const response = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this.apiKey}`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(requestBody),
-          },
-        )
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error("[v0] Multi-speaker API Error:", errorText)
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        if (
-          !data.candidates ||
-          !data.candidates[0] ||
-          !data.candidates[0].content ||
-          !data.candidates[0].content.parts ||
-          !data.candidates[0].content.parts[0] ||
-          !data.candidates[0].content.parts[0].inlineData
-        ) {
-          throw new Error("לא התקבל אודיו מה-API")
-        }
-
-        const audioData = data.candidates[0].content.parts[0].inlineData.data
-        if (!audioData) {
-          throw new Error("התקבל אודיו ריק מה-API")
-        }
-
-        const pcmBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
-        const wavBlob = this.createWavBlob(pcmBytes)
-        audioBlobs.push(wavBlob)
-      } else {
-        console.log("[v0] Using single-speaker mode for", this.speakers.length, "speakers")
-
-        for (const [speaker, text] of Object.entries(speakerTexts)) {
-          const speakerIndex = this.speakers.indexOf(speaker)
-          const voiceName = voiceNames[speakerIndex % voiceNames.length]
-
-          console.log(`[v0] Processing speaker: ${speaker}, Voice: ${voiceName}`)
-
+        let response
+        for (let attempt = 0; attempt < 3; attempt++) {
           const requestBody = {
             contents: [{ parts: [{ text: text.trim() }] }],
             generationConfig: {
@@ -303,7 +238,7 @@ class StoryGenerator {
             },
           }
 
-          const response = await fetch(
+          response = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this.apiKey}`,
             {
               method: "POST",
@@ -314,45 +249,51 @@ class StoryGenerator {
             },
           )
 
-          if (!response.ok) {
-            const errorText = await response.text()
-            console.error(`[v0] API Error for speaker ${speaker}:`, errorText)
-            throw new Error(`HTTP error! status: ${response.status}`)
+          if (response.ok || response.status !== 429) break
+
+          console.log(`[v0] Retry ${attempt + 1} after 47s due to 429`)
+          await new Promise((r) => setTimeout(r, 47000))
+        }
+
+        if (!response.ok) {
+          if (response.status === 429) {
+            throw new Error("שגיאה 429: מלאה מכסת חינם, עבור לתשלום ב-https://console.cloud.google.com/")
           }
+          const errorText = await response.text()
+          console.error(`[v0] API Error for speaker ${speaker}:`, errorText)
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
 
-          const data = await response.json()
+        const data = await response.json()
 
-          if (
-            !data.candidates ||
-            !data.candidates[0] ||
-            !data.candidates[0].content ||
-            !data.candidates[0].content.parts ||
-            !data.candidates[0].content.parts[0] ||
-            !data.candidates[0].content.parts[0].inlineData
-          ) {
-            console.warn(`[v0] No audio received for speaker ${speaker}, skipping`)
-            continue
-          }
+        if (
+          !data.candidates ||
+          !data.candidates[0] ||
+          !data.candidates[0].content ||
+          !data.candidates[0].content.parts ||
+          !data.candidates[0].content.parts[0] ||
+          !data.candidates[0].content.parts[0].inlineData
+        ) {
+          console.warn(`[v0] No audio received for speaker ${speaker}, skipping`)
+          continue
+        }
 
-          const audioData = data.candidates[0].content.parts[0].inlineData.data
-          if (!audioData) {
-            console.warn(`[v0] Empty audio data for speaker ${speaker}, skipping`)
-            continue
-          }
+        const audioData = data.candidates[0].content.parts[0].inlineData.data
+        if (!audioData) {
+          console.warn(`[v0] Empty audio data for speaker ${speaker}, skipping`)
+          continue
+        }
 
-          const pcmBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
-          const wavBlob = this.createWavBlob(pcmBytes)
-          audioBlobs.push(wavBlob)
+        const pcmBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
+        const wavBlob = this.createWavBlob(pcmBytes)
+        audioBlobs.push(wavBlob)
 
-          const silenceBlob = this.createSilenceBlob(500) // 0.5 seconds
+        if (Object.keys(speakerTexts).indexOf(speaker) < Object.keys(speakerTexts).length - 1) {
+          const silenceBlob = this.createSilenceBlob(500)
           audioBlobs.push(silenceBlob)
-
-          await new Promise((resolve) => setTimeout(resolve, 500))
         }
 
-        if (audioBlobs.length > 0 && audioBlobs[audioBlobs.length - 1].size < 1000) {
-          audioBlobs.pop()
-        }
+        await new Promise((resolve) => setTimeout(resolve, 1000))
       }
 
       if (audioBlobs.length === 0) {
@@ -364,6 +305,10 @@ class StoryGenerator {
       console.log("[v0] Gemini TTS audio generation completed successfully with combined audio")
     } catch (error) {
       console.error("[v0] Error in generateAudioWithGeminiTTS:", error)
+
+      if (error.message.includes("429")) {
+        throw error
+      }
 
       if (error.message.includes("400") || error.message.includes("HTTP error")) {
         throw new Error("שגיאה ב-API: נסה טקסט קצר יותר או בדוק את המפתח.")
@@ -541,10 +486,10 @@ class StoryGenerator {
     const bytesPerSample = bitsPerSample / 8
     const blockAlign = numChannels * bytesPerSample
     const byteRate = sampleRate * blockAlign
-    const dataSize = pcmData.length
-    const fileSize = 36 + dataSize
+    const dataSize = pcmData.length * 2 // 16-bit samples
+    const fileSize = 44 + dataSize
 
-    const buffer = new ArrayBuffer(44 + dataSize)
+    const buffer = new ArrayBuffer(fileSize)
     const view = new DataView(buffer)
 
     const writeString = (offset, string) => {
@@ -553,12 +498,10 @@ class StoryGenerator {
       }
     }
 
-    // RIFF header
     writeString(0, "RIFF")
-    view.setUint32(4, fileSize, true)
+    view.setUint32(4, fileSize - 8, true)
     writeString(8, "WAVE")
 
-    // fmt chunk
     writeString(12, "fmt ")
     view.setUint32(16, 16, true) // chunk size
     view.setUint16(20, 1, true) // audio format (PCM)
@@ -568,13 +511,12 @@ class StoryGenerator {
     view.setUint16(32, blockAlign, true)
     view.setUint16(34, bitsPerSample, true)
 
-    // data chunk
     writeString(36, "data")
     view.setUint32(40, dataSize, true)
 
-    // Copy PCM data
-    for (let i = 0; i < pcmData.length; i++) {
-      view.setUint8(44 + i, pcmData[i])
+    for (let i = 0; i < pcmData.length / 2; i++) {
+      const sample = (pcmData[i * 2 + 1] << 8) | pcmData[i * 2]
+      view.setInt16(44 + i * 2, sample, true)
     }
 
     return new Blob([buffer], { type: "audio/wav" })
