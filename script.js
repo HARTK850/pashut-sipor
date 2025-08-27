@@ -228,8 +228,10 @@ class StoryGenerator {
           },
         }))
 
+        const cleanText = segments.map((seg) => seg.text).join(" ")
+
         const requestBody = {
-          contents: [{ parts: [{ text: scriptContent }] }],
+          contents: [{ parts: [{ text: cleanText }] }],
           generationConfig: {
             responseModalities: ["AUDIO"],
             speechConfig: {
@@ -275,9 +277,9 @@ class StoryGenerator {
           throw new Error("התקבל אודיו ריק מה-API")
         }
 
-        const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
-        const audioBlob = new Blob([audioBuffer], { type: "audio/wav" })
-        audioBlobs.push(audioBlob)
+        const pcmBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
+        const wavBlob = this.createWavBlob(pcmBytes)
+        audioBlobs.push(wavBlob)
       } else {
         console.log("[v0] Using single-speaker mode for", this.speakers.length, "speakers")
 
@@ -338,14 +340,18 @@ class StoryGenerator {
             continue
           }
 
-          const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
-          const audioBlob = new Blob([audioBuffer], { type: "audio/wav" })
-          audioBlobs.push(audioBlob)
+          const pcmBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
+          const wavBlob = this.createWavBlob(pcmBytes)
+          audioBlobs.push(wavBlob)
 
-          const silenceBlob = this.createSilenceBlob(1000) // 1 second
+          const silenceBlob = this.createSilenceBlob(500) // 0.5 seconds
           audioBlobs.push(silenceBlob)
 
           await new Promise((resolve) => setTimeout(resolve, 500))
+        }
+
+        if (audioBlobs.length > 0 && audioBlobs[audioBlobs.length - 1].size < 1000) {
+          audioBlobs.pop()
         }
       }
 
@@ -496,7 +502,7 @@ class StoryGenerator {
   }
 
   createSilenceBlob(durationMs) {
-    const sampleRate = 44100
+    const sampleRate = 24000 // Match Gemini TTS sample rate
     const numSamples = Math.floor((sampleRate * durationMs) / 1000)
     const buffer = new ArrayBuffer(44 + numSamples * 2)
     const view = new DataView(buffer)
@@ -523,6 +529,52 @@ class StoryGenerator {
 
     for (let i = 0; i < numSamples; i++) {
       view.setInt16(44 + i * 2, 0, true)
+    }
+
+    return new Blob([buffer], { type: "audio/wav" })
+  }
+
+  createWavBlob(pcmData) {
+    const numChannels = 1
+    const sampleRate = 24000 // Gemini TTS uses 24kHz
+    const bitsPerSample = 16
+    const bytesPerSample = bitsPerSample / 8
+    const blockAlign = numChannels * bytesPerSample
+    const byteRate = sampleRate * blockAlign
+    const dataSize = pcmData.length
+    const fileSize = 36 + dataSize
+
+    const buffer = new ArrayBuffer(44 + dataSize)
+    const view = new DataView(buffer)
+
+    const writeString = (offset, string) => {
+      for (let i = 0; i < string.length; i++) {
+        view.setUint8(offset + i, string.charCodeAt(i))
+      }
+    }
+
+    // RIFF header
+    writeString(0, "RIFF")
+    view.setUint32(4, fileSize, true)
+    writeString(8, "WAVE")
+
+    // fmt chunk
+    writeString(12, "fmt ")
+    view.setUint32(16, 16, true) // chunk size
+    view.setUint16(20, 1, true) // audio format (PCM)
+    view.setUint16(22, numChannels, true)
+    view.setUint32(24, sampleRate, true)
+    view.setUint32(28, byteRate, true)
+    view.setUint16(32, blockAlign, true)
+    view.setUint16(34, bitsPerSample, true)
+
+    // data chunk
+    writeString(36, "data")
+    view.setUint32(40, dataSize, true)
+
+    // Copy PCM data
+    for (let i = 0; i < pcmData.length; i++) {
+      view.setUint8(44 + i, pcmData[i])
     }
 
     return new Blob([buffer], { type: "audio/wav" })
