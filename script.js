@@ -131,7 +131,7 @@ class StoryGenerator {
   }
 
   buildScriptPrompt(storyIdea) {
-    let prompt = `צור תסריט לסיפור מעניין ומקורי`
+    let prompt = `צור סיפור מעניין ומקורי`
 
     if (storyIdea) {
       prompt += ` על בסיס הרעיון: ${storyIdea}`
@@ -143,22 +143,20 @@ class StoryGenerator {
 
 הוראות חשובות:
 - בחר סגנון מתאים (כמו דרמה, קומדיה, הרפתקאות) בעצמך
-- בחר מספר דוברים מתאים לסיפור (ללא הגבלה, כמה שצריך לסיפור)
-- תן לכל דובר שם ברור ומובחן
-- השתמש בפורמט: [שם הדובר]: הטקסט שלו
-- התסריט צריך להיות באורך 2-5 דקות קריאה
-- אופציונלי: הוסף [צליל ...] או [מוזיקה ...] אם מתאים לסיפור
+- כתב את הסיפור בפורמט של דובר אחד (קריין) שמספר את הסיפור
+- השתמש בפורמט: [קריין]: הטקסט של הסיפור
+- הסיפור צריך להיות באורך 2-5 דקות קריאה
+- כתב בסגנון סיפור מסופר (לדוגמא: "חיים נכנס הביתה, אמו קיבלה אותו באהבה")
+- אל תכתב דיאלוגים ישירים, אלא תאר את מה שקורה
 
 התסריט צריך להיות:
 - באורך של 2-5 דקות קריאה
-- עם דיאלוגים ברורים וחלוקה ברורה בין הדוברים
 - מעניין ומושך
 - מתאים לקהל הרחב
+- עם קריין אחד שמספר את כל הסיפור
 
 דוגמה לפורמט:
-[מספר]: פעם, בעיר קטנה...
-[גיבור]: אני חייב למצוא את האוצר!
-[חבר]: בוא נלך יחד!
+[קריין]: פעם, בעיר קטנה, חי ילד בשם דוד. יום אחד הוא יצא לחפש הרפתקאות. הוא פגש חבר ישן שהציע לו ללכת יחד לחפש אוצר נסתר...
 
 חשוב מאוד: החזר רק את התסריט עצמו ללא הקדמות, הסברים או טקסט נוסף. התחל ישירות עם השורה הראשונה של התסריט.`
 
@@ -199,107 +197,75 @@ class StoryGenerator {
         throw new Error("לא נמצאו קטעי דיבור בתסריט")
       }
 
-      const speakerTexts = {}
-      segments.forEach((seg) => {
-        if (!speakerTexts[seg.speaker]) speakerTexts[seg.speaker] = []
-        speakerTexts[seg.speaker].push(seg.text)
-      })
+      const allText = segments.map((seg) => seg.text).join(" ")
 
-      const speakerNames = Object.keys(speakerTexts)
-      console.log("[v0] Starting Gemini TTS generation with", speakerNames.length, "speakers:", speakerNames.join(", "))
+      console.log("[v0] Starting Gemini TTS generation with single narrator, text length:", allText.length)
 
-      const voiceNames = ["Kore", "Puck", "Zephyr"]
-      const audioBlobs = []
-
-      for (let i = 0; i < speakerNames.length; i++) {
-        const speaker = speakerNames[i]
-        const textArray = speakerTexts[speaker]
-        const voiceName = voiceNames[i % voiceNames.length]
-        const combinedText = textArray.join(" ")
-
-        console.log(`[v0] Processing speaker: ${speaker}, Voice: ${voiceName}, Text length: ${combinedText.length}`)
-
-        let response
-        for (let attempt = 0; attempt < 3; attempt++) {
-          const requestBody = {
-            contents: [{ parts: [{ text: combinedText }] }],
-            generationConfig: {
-              responseModalities: ["AUDIO"],
-              speechConfig: {
-                voiceConfig: {
-                  prebuiltVoiceConfig: {
-                    voiceName: voiceName,
-                  },
-                },
+      const requestBody = {
+        contents: [{ parts: [{ text: allText }] }],
+        generationConfig: {
+          responseModalities: ["AUDIO"],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: {
+                voiceName: "Kore",
               },
             },
-          }
+          },
+        },
+      }
 
-          response = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this.apiKey}`,
-            {
-              method: "POST",
-              headers: {
-                "Content-Type": "application/json",
-              },
-              body: JSON.stringify(requestBody),
+      let response
+      for (let attempt = 0; attempt < 3; attempt++) {
+        response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this.apiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
             },
-          )
+            body: JSON.stringify(requestBody),
+          },
+        )
 
-          if (response.ok || response.status !== 429) break
+        if (response.ok || response.status !== 429) break
 
-          console.log(`[v0] Retry ${attempt + 1} after 47s due to 429`)
-          await new Promise((r) => setTimeout(r, 47000))
-        }
-
-        if (!response.ok) {
-          if (response.status === 429) {
-            throw new Error("שגיאה 429: מלאה מכסת חינם, עבור לתשלום ב-https://console.cloud.google.com/")
-          }
-          const errorText = await response.text()
-          console.error(`[v0] API Error for speaker ${speaker}:`, errorText)
-          throw new Error(`HTTP error! status: ${response.status}`)
-        }
-
-        const data = await response.json()
-
-        if (
-          !data.candidates ||
-          !data.candidates[0] ||
-          !data.candidates[0].content ||
-          !data.candidates[0].content.parts ||
-          !data.candidates[0].content.parts[0] ||
-          !data.candidates[0].content.parts[0].inlineData
-        ) {
-          console.warn(`[v0] No audio received for speaker ${speaker}, skipping`)
-          continue
-        }
-
-        const audioData = data.candidates[0].content.parts[0].inlineData.data
-        if (!audioData) {
-          console.warn(`[v0] Empty audio data for speaker ${speaker}, skipping`)
-          continue
-        }
-
-        const pcmBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
-        const wavBlob = this.createWavBlob(pcmBytes)
-        audioBlobs.push(wavBlob)
-
-        if (i < speakerNames.length - 1) {
-          const silenceBlob = this.createSilenceBlob(500)
-          audioBlobs.push(silenceBlob)
-        }
-
-        await new Promise((resolve) => setTimeout(resolve, 1000))
+        console.log(`[v0] Retry ${attempt + 1} after 47s due to 429`)
+        await new Promise((r) => setTimeout(r, 47000))
       }
 
-      if (audioBlobs.length === 0) {
-        throw new Error("לא נוצר אודיו עבור אף דובר")
+      if (!response.ok) {
+        if (response.status === 429) {
+          throw new Error("שגיאה 429: מלאה מכסת חינם, עבור לתשלום ב-https://console.cloud.google.com/")
+        }
+        const errorText = await response.text()
+        console.error(`[v0] API Error:`, errorText)
+        throw new Error(`HTTP error! status: ${response.status}`)
       }
 
-      const combinedBlob = new Blob(audioBlobs, { type: "audio/wav" })
-      this.handleAudioResponse(combinedBlob)
-      console.log("[v0] Gemini TTS audio generation completed successfully with combined audio")
+      const data = await response.json()
+
+      if (
+        !data.candidates ||
+        !data.candidates[0] ||
+        !data.candidates[0].content ||
+        !data.candidates[0].content.parts ||
+        !data.candidates[0].content.parts[0] ||
+        !data.candidates[0].content.parts[0].inlineData
+      ) {
+        throw new Error("לא התקבל אודיו מה-API")
+      }
+
+      const audioData = data.candidates[0].content.parts[0].inlineData.data
+      if (!audioData) {
+        throw new Error("נתוני האודיו ריקים")
+      }
+
+      const pcmBytes = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
+      const wavBlob = this.createWavBlob(pcmBytes)
+
+      this.handleAudioResponse(wavBlob)
+      console.log("[v0] Gemini TTS audio generation completed successfully")
     } catch (error) {
       console.error("[v0] Error in generateAudioWithGeminiTTS:", error)
 
