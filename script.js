@@ -199,26 +199,22 @@ class StoryGenerator {
         throw new Error("לא נמצאו קטעי דיבור בתסריט")
       }
 
-      console.log(
-        "[v0] Starting Gemini TTS generation with",
-        segments.length,
-        "segments and",
-        this.speakers.length,
-        "speakers",
-      )
-
-      const voiceNames = ["Kore", "Puck", "Zephyr"]
-      const audioBlobs = []
-
       const speakerTexts = {}
       segments.forEach((seg) => {
         if (!speakerTexts[seg.speaker]) speakerTexts[seg.speaker] = []
         speakerTexts[seg.speaker].push(seg.text)
       })
 
-      for (const [speaker, textArray] of Object.entries(speakerTexts)) {
-        const speakerIndex = this.speakers.indexOf(speaker)
-        const voiceName = voiceNames[speakerIndex % voiceNames.length]
+      const speakerNames = Object.keys(speakerTexts)
+      console.log("[v0] Starting Gemini TTS generation with", speakerNames.length, "speakers:", speakerNames.join(", "))
+
+      const voiceNames = ["Kore", "Puck", "Zephyr"]
+      const audioBlobs = []
+
+      for (let i = 0; i < speakerNames.length; i++) {
+        const speaker = speakerNames[i]
+        const textArray = speakerTexts[speaker]
+        const voiceName = voiceNames[i % voiceNames.length]
         const combinedText = textArray.join(" ")
 
         console.log(`[v0] Processing speaker: ${speaker}, Voice: ${voiceName}, Text length: ${combinedText.length}`)
@@ -289,7 +285,7 @@ class StoryGenerator {
         const wavBlob = this.createWavBlob(pcmBytes)
         audioBlobs.push(wavBlob)
 
-        if (Object.keys(speakerTexts).indexOf(speaker) < Object.keys(speakerTexts).length - 1) {
+        if (i < speakerNames.length - 1) {
           const silenceBlob = this.createSilenceBlob(500)
           audioBlobs.push(silenceBlob)
         }
