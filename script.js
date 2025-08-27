@@ -212,20 +212,21 @@ class StoryGenerator {
 
       const speakerTexts = {}
       segments.forEach((seg) => {
-        if (!speakerTexts[seg.speaker]) speakerTexts[seg.speaker] = ""
-        speakerTexts[seg.speaker] += seg.text + " "
+        if (!speakerTexts[seg.speaker]) speakerTexts[seg.speaker] = []
+        speakerTexts[seg.speaker].push(seg.text)
       })
 
-      for (const [speaker, text] of Object.entries(speakerTexts)) {
+      for (const [speaker, textArray] of Object.entries(speakerTexts)) {
         const speakerIndex = this.speakers.indexOf(speaker)
         const voiceName = voiceNames[speakerIndex % voiceNames.length]
+        const combinedText = textArray.join(" ")
 
-        console.log(`[v0] Processing speaker: ${speaker}, Voice: ${voiceName}`)
+        console.log(`[v0] Processing speaker: ${speaker}, Voice: ${voiceName}, Text length: ${combinedText.length}`)
 
         let response
         for (let attempt = 0; attempt < 3; attempt++) {
           const requestBody = {
-            contents: [{ parts: [{ text: text.trim() }] }],
+            contents: [{ parts: [{ text: combinedText }] }],
             generationConfig: {
               responseModalities: ["AUDIO"],
               speechConfig: {
