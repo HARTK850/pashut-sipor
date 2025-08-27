@@ -146,6 +146,7 @@ class StoryGenerator {
 - בחר מספר דוברים מתאים לסיפור (ללא הגבלה, כמה שצריך לסיפור)
 - תן לכל דובר שם ברור ומובחן
 - השתמש בפורמט: [שם הדובר]: הטקסט שלו
+- התסריט צריך להיות קצר: 10-15 שורות דיאלוג max
 - אופציונלי: הוסף [צליל ...] או [מוזיקה ...] אם מתאים לסיפור
 
 התסריט צריך להיות:
@@ -198,78 +199,88 @@ class StoryGenerator {
         throw new Error("לא נמצאו קטעי דיבור בתסריט")
       }
 
-      console.log("[v0] Starting Gemini TTS generation with", segments.length, "segments")
-
-      // Available voice names for Hebrew
-      const voiceNames = ["Kore", "Puck", "Zephyr", "Charon", "Fenrir"]
-
-      const requestBody = {
-        contents: [{ parts: [{ text: scriptContent }] }],
-        generationConfig: {
-          responseModalities: ["AUDIO"],
-          speechConfig: {},
-        },
-      }
-
-      // If multiple speakers, use multiSpeakerVoiceConfig
-      if (this.speakers.length > 1) {
-        const multiSpeakerConfig = this.speakers.map((speaker, index) => ({
-          speaker: speaker,
-          voiceName: voiceNames[index % voiceNames.length],
-        }))
-
-        requestBody.generationConfig.speechConfig.multiSpeakerVoiceConfig = {
-          voices: multiSpeakerConfig.map((config) => ({
-            voiceName: config.voiceName,
-          })),
-        }
-      } else {
-        // Single speaker configuration
-        requestBody.generationConfig.speechConfig.voiceConfig = {
-          voiceName: voiceNames[0],
-        }
-      }
-
-      const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this.apiKey}`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(requestBody),
-        },
+      console.log(
+        "[v0] Starting Gemini TTS generation with",
+        segments.length,
+        "segments and",
+        this.speakers.length,
+        "speakers",
       )
 
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`)
+      const voiceNames = ["Kore", "Puck", "Zephyr"]
+      const audioBlobs = []
+
+      for (let i = 0; i < segments.length; i++) {
+        const segment = segments[i]
+        const speakerIndex = this.speakers.indexOf(segment.speaker)
+        const voiceName = voiceNames[speakerIndex % voiceNames.length]
+
+        console.log(
+          `[v0] Processing segment ${i + 1}/${segments.length} - Speaker: ${segment.speaker}, Voice: ${voiceName}`,
+        )
+
+        const requestBody = {
+          contents: [{ parts: [{ text: `[${segment.speaker}]: ${segment.text}` }] }],
+          generationConfig: {
+            responseModalities: ["AUDIO"],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: {
+                  voiceName: voiceName,
+                },
+              },
+            },
+          },
+        }
+
+        const response = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this.apiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(requestBody),
+          },
+        )
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`[v0] API Error for segment ${i + 1}:`, errorText)
+          throw new Error(`HTTP error! status: ${response.status}`)
+        }
+
+        const data = await response.json()
+
+        if (
+          !data.candidates ||
+          !data.candidates[0] ||
+          !data.candidates[0].content ||
+          !data.candidates[0].content.parts ||
+          !data.candidates[0].content.parts[0] ||
+          !data.candidates[0].content.parts[0].inlineData
+        ) {
+          throw new Error(`לא התקבל אודיו מה-API עבור קטע ${i + 1}`)
+        }
+
+        const audioData = data.candidates[0].content.parts[0].inlineData.data
+        const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
+        const audioBlob = new Blob([audioBuffer], { type: "audio/wav" })
+        audioBlobs.push(audioBlob)
+
+        if (i < segments.length - 1) {
+          await new Promise((resolve) => setTimeout(resolve, 500))
+        }
       }
 
-      const data = await response.json()
-
-      if (
-        !data.candidates ||
-        !data.candidates[0] ||
-        !data.candidates[0].content ||
-        !data.candidates[0].content.parts ||
-        !data.candidates[0].content.parts[0] ||
-        !data.candidates[0].content.parts[0].inlineData
-      ) {
-        throw new Error("לא התקבל אודיו מה-API")
-      }
-
-      const audioData = data.candidates[0].content.parts[0].inlineData.data
-      const audioBuffer = Uint8Array.from(atob(audioData), (c) => c.charCodeAt(0))
-      const audioBlob = new Blob([audioBuffer], { type: "audio/wav" })
-
-      this.handleAudioResponse(audioBlob)
-      console.log("[v0] Gemini TTS audio generation completed successfully")
+      const combinedBlob = new Blob(audioBlobs, { type: "audio/wav" })
+      this.handleAudioResponse(combinedBlob)
+      console.log("[v0] Gemini TTS audio generation completed successfully with combined audio")
     } catch (error) {
       console.error("[v0] Error in generateAudioWithGeminiTTS:", error)
 
-      // Add Hebrew language fallback message
       if (error.message.includes("400") || error.message.includes("HTTP error")) {
-        throw new Error("שגיאה ביצירת השמע. אם האודיו לא בעברית, אנא פנה לתמיכה.")
+        throw new Error("שגיאה ב-API: בדוק את האורך או מספר הבקשות.")
       }
 
       throw error
