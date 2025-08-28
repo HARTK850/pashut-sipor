@@ -142,18 +142,20 @@ class StoryGenerator {
     prompt += `
 
 הוראות חשובות:
-- בחר סגנון מתאים (כמו דרמה, קומדיה, הרפתקאות) בעצמך
+- בחר סגנון מתאים (כמו דרמה, קומדיה, הרפתקאות, מסתורין, רומנטיקה) בעצמך
 - כתב את הסיפור בפורמט של דובר אחד (קריין) שמספר את הסיפור
 - השתמש בפורמט: [קריין]: הטקסט של הסיפור
 - הסיפור צריך להיות באורך 2-5 דקות קריאה
 - כתב בסגנון סיפור מסופר (לדוגמא: "חיים נכנס הביתה, אמו קיבלה אותו באהבה")
 - אל תכתב דיאלוגים ישירים, אלא תאר את מה שקורה
+- התאם את סגנון הכתיבה לסגנון הסיפור (דרמטי, מרגש, מסתורי, קומי וכו')
 
 התסריט צריך להיות:
 - באורך של 2-5 דקות קריאה
 - מעניין ומושך
 - מתאים לקהל הרחב
 - עם קריין אחד שמספר את כל הסיפור
+- עם סגנון הקראה שמתאים לאופי הסיפור
 
 דוגמה לפורמט:
 [קריין]: פעם, בעיר קטנה, חי ילד בשם דוד. יום אחד הוא יצא לחפש הרפתקאות. הוא פגש חבר ישן שהציע לו ללכת יחד לחפש אוצר נסתר...
@@ -201,6 +203,8 @@ class StoryGenerator {
 
       console.log("[v0] Starting Gemini TTS generation with single narrator, text length:", allText.length)
 
+      const speechStyle = this.determineSpeechStyle(allText)
+
       const requestBody = {
         contents: [{ parts: [{ text: allText }] }],
         generationConfig: {
@@ -208,8 +212,15 @@ class StoryGenerator {
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: {
-                voiceName: "Kore",
+                voiceName: "Puck", // Male voice - deep and pleasant
               },
+            },
+            audioConfig: {
+              audioEncoding: "LINEAR16",
+              speakingRate: speechStyle.speakingRate,
+              pitch: speechStyle.pitch,
+              volumeGainDb: speechStyle.volumeGainDb,
+              effectsProfileId: speechStyle.effectsProfileId,
             },
           },
         },
@@ -483,6 +494,69 @@ class StoryGenerator {
     }
 
     return new Blob([buffer], { type: "audio/wav" })
+  }
+
+  determineSpeechStyle(text) {
+    const lowerText = text.toLowerCase()
+
+    // Check for story themes and adjust speech style accordingly
+    if (
+      lowerText.includes("מסתורין") ||
+      lowerText.includes("חשוך") ||
+      lowerText.includes("מפחיד") ||
+      lowerText.includes("סוד")
+    ) {
+      return {
+        speakingRate: 0.85, // Slower for mystery
+        pitch: -2.0, // Lower pitch for suspense
+        volumeGainDb: 2.0,
+        effectsProfileId: ["telephony-class-application"],
+      }
+    } else if (
+      lowerText.includes("קומדיה") ||
+      lowerText.includes("מצחיק") ||
+      lowerText.includes("צחוק") ||
+      lowerText.includes("שמח")
+    ) {
+      return {
+        speakingRate: 1.1, // Faster for comedy
+        pitch: 1.0, // Higher pitch for cheerfulness
+        volumeGainDb: 3.0,
+        effectsProfileId: ["wearable-class-device"],
+      }
+    } else if (
+      lowerText.includes("דרמה") ||
+      lowerText.includes("עצוב") ||
+      lowerText.includes("רגשי") ||
+      lowerText.includes("מרגש")
+    ) {
+      return {
+        speakingRate: 0.9, // Slower for drama
+        pitch: -1.0, // Slightly lower pitch
+        volumeGainDb: 4.0,
+        effectsProfileId: ["headphone-class-device"],
+      }
+    } else if (
+      lowerText.includes("הרפתקה") ||
+      lowerText.includes("פעולה") ||
+      lowerText.includes("מהיר") ||
+      lowerText.includes("ריצה")
+    ) {
+      return {
+        speakingRate: 1.15, // Faster for adventure
+        pitch: 0.5, // Slightly higher pitch for excitement
+        volumeGainDb: 5.0,
+        effectsProfileId: ["wearable-class-device"],
+      }
+    } else {
+      // Default storytelling style
+      return {
+        speakingRate: 1.0, // Normal speed
+        pitch: 0.0, // Normal pitch
+        volumeGainDb: 3.0,
+        effectsProfileId: ["headphone-class-device"],
+      }
+    }
   }
 }
 
