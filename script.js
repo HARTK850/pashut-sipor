@@ -182,7 +182,7 @@ class StoryGenerator {
           }
         });
 
-        if (this.settings[field.setting] && !Array.from(options).some(option => option.getAttribute("data-value") === this.settings[field.setting]) && field.customInput) {
+        if (this.settings[field.setting] && !options.forEach(option => option.getAttribute("data-value") === this.settings[field.setting]) && field.customInput) {
           selectedText = this.settings[field.setting];
           isCustom = true;
         }
@@ -388,33 +388,20 @@ class StoryGenerator {
         throw new Error("לא נמצאו קטעי דיבור בתסריט");
       }
 
-      // Create narration text without style descriptions
-      const narrationText = segments.map(seg => `[${seg.speaker}]: ${seg.textToRead}`).join("\n");
-      const styleInstructions = segments.map(seg => ({
-        speaker: seg.speaker,
-        style: seg.style || "",
-        startText: seg.textToRead.substring(0, 10) // Short identifier for matching
-      }));
+      const allText = segments.map(seg => {
+        const styleMatch = seg.text.match(/^\(([^)]+)\)\s*(.+)$/);
+        if (styleMatch) {
+          return `[${seg.speaker}]: (${styleMatch[1]}) ${styleMatch[2]}`;
+        }
+        return `[${seg.speaker}]: ${seg.text}`;
+      }).join("\n");
 
-      console.log("[v0] Starting Gemini TTS generation with single narrator, text length:", narrationText.length);
-      console.log("[v0] Style instructions:", styleInstructions);
+      console.log("[v0] Starting Gemini TTS generation with single narrator, text length:", allText.length);
 
-      let narrationPrompt = `Narrate this story dynamically using a single narrator who adjusts their voice style based on the style descriptions provided separately. Do NOT read any text within parentheses (e.g., (קול עמוק וסמכותי)) aloud; use it only as a guide for the voice style for the following text until the next style description. The narration should be engaging and match the context of the story. At the end of the story, add the following advertisement in a lively, promotional narration style (without including it in the displayed script): "סיפור זה הופק בטכנולוגיה החדשנית של 'פשוט סיפור'! רוצים ליצור סיפור משלכם? שלחו אימייל ל-y15761576@gmail.com עם הכותרת 'פשוט סיפור' וקבלו קישור לאתר שלנו!"
-
-Style instructions:
-${styleInstructions.map((inst, index) => `${index + 1}. [${inst.speaker}]: (${inst.style}) starting with "${inst.startText}..."`).join("\n")}
-
-Text to narrate (do not read text in parentheses):
-${narrationText}`;
+      let narrationPrompt = `Narrate this story dynamically, using a single narrator who adjusts their voice style based on the descriptions in parentheses (e.g., (קול עמוק וסמכותי), (קול עייף ומבוגר)). Do not read the text within parentheses aloud, but use it to guide the voice style for the following text until the next style description. The narration should be engaging and match the context of the story. At the end of the story, add the following advertisement in a lively, promotional narration style (without including it in the displayed script): "סיפור זה הופק בטכנולוגיה החדשנית של 'פשוט סיפור'! רוצים ליצור סיפור משלכם? שלחו אימייל ל-y15761576@gmail.com עם הכותרת 'פשוט סיפור' וקבלו קישור לאתר שלנו!"\n\nText to narrate:\n${allText}`;
 
       if (this.settings.narrationStyle && this.settings.narrationStyle !== "") {
-        narrationPrompt = `Narrate this story in a ${this.settings.narrationStyle} style, but adjust the voice based on the style descriptions provided separately. Do NOT read any text within parentheses (e.g., (קול עמוק וסמכותי)) aloud; use it only as a guide for the voice style for the following text until the next style description. At the end, add the following advertisement in a lively, promotional narration style (without including it in the displayed script): "סיפור זה הופק בטכנולוגיה החדשנית של 'פשוט סיפור'! רוצים ליצור סיפור משלכם? שלחו אימייל ל-y15761576@gmail.com עם הכותרת 'פשוט סיפור' וקבלו קישור לאתר שלנו!"
-
-Style instructions:
-${styleInstructions.map((inst, index) => `${index + 1}. [${inst.speaker}]: (${inst.style}) starting with "${inst.startText}..."`).join("\n")}
-
-Text to narrate (do not read text in parentheses):
-${narrationText}`;
+        narrationPrompt = `Narrate this story in a ${this.settings.narrationStyle} style, but still adjust the voice based on the style descriptions in parentheses (e.g., (קול עמוק וסמכותי)). Do not read the text within parentheses aloud, but use it to guide the voice style for the following text until the next style description. At the end, add the following advertisement in a lively, promotional narration style (without including it in the displayed script): "סיפור זה הופק בטכנולוגיה החדשנית של 'פשוט סיפור'! רוצים ליצור סיפור משלכם? שלחו אימייל ל-y15761576@gmail.com עם הכותרת 'פשוט סיפור' וקבלו קישור לאתר שלנו!"\n\nText to narrate:\n${allText}`;
       }
 
       const requestBody = {
@@ -504,14 +491,13 @@ ${narrationText}`;
     const segments = [];
 
     for (const line of lines) {
-      const match = line.match(/\[([^\]]+)\]:\s*(?:\( ([^\)]+) \))?\s*(.+)/);
+      const match = line.match(/\[([^\]]+)\]:\s*(.+)/);
       if (match) {
         const speaker = match[1].trim();
-        const style = match[2] ? match[2].trim() : "";
-        const textToRead = match[3].trim();
+        const text = match[2].trim();
 
-        if (!speaker.includes("צליל") && !speaker.includes("מוזיקה") && textToRead) {
-          segments.push({ speaker, style, textToRead });
+        if (!speaker.includes("צליל") && !speaker.includes("מוזיקה") && text) {
+          segments.push({ speaker, text });
         }
       }
     }
