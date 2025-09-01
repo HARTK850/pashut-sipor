@@ -381,7 +381,7 @@ class StoryGenerator {
         startText: seg.textToRead.substring(0, 20)
       }));
 
-      let narrationPrompt = `Narrate the following story. **DO NOT READ ANY TEXT WITHIN PARENTHESES** (e.g., (קול עמוק וסמכותי)) aloud; these are style instructions only and must be used to adjust the voice style for the corresponding segment. At the end, add this advertisement in a lively, promotional voice (do not include it in the displayed script): "סיפור זה הופק בטכנולוגיה החדשנית של 'פשוט סיפור'! רוצים ליצור סיפור משלכם? שלחו אימייל ל-y15761576@gmail.com עם הכותרת 'פשוט סיפור' וקבלו קישור לאתר שלנו!"
+      let narrationPrompt = `Narrate the following story. **DO NOT READ ANY TEXT WITHIN PARENTHESES** (e.g., (קול עמוק וסמכותי)) aloud; these are style instructions only and must be used to adjust the voice style for the corresponding segment. At the end, add this advertisement in a lively, promotional voice (do not include it in the displayed script): "סיפור זה הופק בטכנולוגיה החדשנית של 'פשוט סיפור'! רוצים ליצור סיפור משלכם? שלחו אימייל ל-y 15761576 שטרודל gmail.com עם הכותרת 'פשוט סיפור' וקבלו קישור לאתר שלנו!"
 
 Style instructions for each segment:
 ${styleInstructions.map(inst => `${inst.segmentNumber}. [${inst.speaker}]: Use a "${inst.style}" voice for text starting with "${inst.startText}..."`).join("\n")}
