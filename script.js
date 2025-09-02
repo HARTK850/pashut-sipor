@@ -290,7 +290,12 @@ class StoryGenerator {
       }
 
       const data = await response.json();
-      const scriptContent = data.candidates[0].content.parts[0].text;
+      let scriptContent = data.candidates[0].content.parts[0].text;
+
+      // ניקוד תקין והתאמת פורמט
+      scriptContent = scriptContent.replace(/(\[.*?\]):/g, match => match + " "); // ודא רווח אחרי שם הדובר
+      scriptContent = scriptContent.replace(/\(.*?\)/g, match => match + " "); // ודא רווח אחרי הסגנון
+      scriptContent = this.addHebrewPunctuation(scriptContent);
 
       document.getElementById("scriptContent").value = scriptContent;
       this.currentScript = scriptContent;
@@ -308,9 +313,16 @@ class StoryGenerator {
   }
 
   buildScriptPrompt(storyIdea) {
-    let prompt = `צור תסריט לסיפור קצר בעברית על "${storyIdea}". התסריט צריך להיות בפורמט: [דובר]: (סגנון) טקסט. השתמש בסוגריים לסגנון הקראה דינמי. כלול פרסומת בסוף.`;
-    // הוסף כאן לוגיקה נוספת אם צריך, מהקוד המקורי (היה truncated)
+    let prompt = `צור תסריט קצר בעברית על "${storyIdea}" בפורמט מדויק: [דובר]: (סגנון) טקסט. השתמש בניקוד תקין בעברית בכל הטקסט. כל שורה חייבת לכלול דובר וסגנון בתוך סוגריים, למשל [קריין]: (קול רגוע) טקסט. אל תשתמש ב-# או ב-[סצנה] או בתיאורי סביבה נפרדים. ודא שהסגנון בתוך הסוגריים לא יוקרא כחלק מהטקסט, אלא ישמש רק כהנחיה. כלול פרסומת בסוף התסריט.`;
     return prompt;
+  }
+
+  addHebrewPunctuation(text) {
+    return text.replace(/([א-ת][^.!?]*[.!?])\s*/g, match => {
+      let punctuated = match.trim();
+      if (!/[.!?]$/.test(punctuated)) punctuated += ".";
+      return punctuated + " ";
+    });
   }
 
   async generateAudio() {
@@ -343,10 +355,11 @@ class StoryGenerator {
       throw new Error("אין תסריט להקראה");
     }
 
-    let narrationPrompt = `Narrate this story dynamically: ${narrationText}.`; // התאם מהמקור
+    // הסר את הסגנונות מהטקסט לקריאה
+    let cleanText = narrationText.replace(/\s*\([^()]*\)/g, "").trim();
 
     const requestBody = {
-      contents: [{ parts: [{ text: narrationPrompt }] }],
+      contents: [{ parts: [{ text: cleanText }] }],
       generationConfig: {
         responseModalities: ["AUDIO"],
         speechConfig: {
@@ -361,35 +374,36 @@ class StoryGenerator {
       },
     };
 
-    console.log("Sending TTS request with body:", JSON.stringify(requestBody));
-
     let response;
     for (let attempt = 0; attempt < 3; attempt++) {
       response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-tts:generateContent?key=${this.apiKey}`,
         {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers: { "Content-Type": "application/json" },
           body: JSON.stringify(requestBody),
-        },
+        }
       );
 
-      if (response.ok || response.status !== 429) break;
-
-      console.log(`Retry ${attempt + 1} after 60s due to 429`);
-      await new Promise((r) => setTimeout(r, 60000));
+      if (response.ok) break;
+      if (response.status !== 429) throw new Error(`HTTP error! status: ${response.status}`);
+      await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
     }
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error("API error response:", errorText);
-      throw new Error(errorText);
+      throw new Error(`Failed after retries: HTTP ${response.status}`);
     }
 
     const data = await response.json();
-    console.log("API response data:", data);
+    const audioContent = data.candidates[0].content.audio;
+    this.currentAudioBlob = new Blob([new Uint8Array(audioContent.data)], { type: "audio/wav" });
+    const audioUrl = URL.createObjectURL(this.currentAudioBlob);
+    const audioPlayer = document.getElementById("audioPlayer");
+    audioPlayer.src = audioUrl;
+    audioPlayer.style.display = "block";
+    document.getElementById("audioPlaceholder").style.display = "none";
+    document.getElementById("downloadAudio").style.display = "inline-flex";
+  }
 
     if (!data.candidates || !data.candidates[0] || !data.candidates[0].content || !data.candidates[0].content.parts || !data.candidates[0].content.parts[0] || !data.candidates[0].content.parts[0].inlineData || !data.candidates[0].content.parts[0].inlineData.data) {
       throw new Error("לא התקבל אודיו מה-API - תגובה ריקה או לא תקינה");
