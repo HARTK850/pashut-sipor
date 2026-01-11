@@ -131,7 +131,7 @@ class StoryGenerator {
     }
   }
 
-  async saveApiKey() {
+async saveApiKey() {
     const apiKeyInput = document.getElementById("apiKey");
     const apiKey = apiKeyInput.value.trim();
 
@@ -140,31 +140,36 @@ class StoryGenerator {
       return;
     }
 
+    this.showStatus("apiStatus", "בודק מפתח...", "normal");
+
     try {
+      // שינוי: במקום לנסות לייצר תוכן עם מודל ספציפי שעלול להיכשל,
+      // אנחנו פונים לכתובת הכללית שמחזירה את רשימת המודלים.
+      // זו הדרך הכי בטוחה לבדוק שהמפתח תקין.
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash-latest:generateContent?key=${apiKey}`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: "Test" }] }],
-          }),
-        }
+        `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
       );
 
-      if (!response.ok) {
+      const data = await response.json();
+
+      // בדיקה אם קיבלנו שגיאה או שהבקשה נכשלה
+      if (!response.ok || data.error) {
         throw new Error("API Key not valid");
       }
 
+      // אם הגענו לפה - המפתח תקין
       this.apiKey = apiKey;
       localStorage.setItem("gemini_api_key", apiKey);
       this.showStatus("apiStatus", "מפתח API תקין! החלון ייסגר בעוד מספר שניות...", "success");
+      
       setTimeout(() => {
         document.getElementById("apiKeyModal").style.display = "none";
         document.getElementById("apiStatus").style.display = "none";
-      }, 3000);
+      }, 1500);
+
     } catch (error) {
-      this.showStatus("apiStatus", "מפתח API לא תקין", "error");
+      console.error("API Key check error:", error);
+      this.showStatus("apiStatus", "מפתח API לא תקין או שגיאת רשת", "error");
     }
   }
 
